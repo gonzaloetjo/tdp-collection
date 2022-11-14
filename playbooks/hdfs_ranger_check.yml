@@ -9,8 +9,9 @@
   tasks:
     - tosit.tdp.resolve: # noqa unnamed-task
         node_name: hdfs_ranger
-    - name: Check HDFS ranger plugin
-      import_role:
+    - tosit.tdp.resolve:
+        node_name: ranger_hdfs
+    - import_role:
         name: tosit.tdp.hdfs.ranger
         tasks_from: check
-    - meta: clear_facts # noqa unnamed-task
+    - meta: clear_facts
