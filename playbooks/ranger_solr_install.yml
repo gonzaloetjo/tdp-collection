@@ -2,12 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ---
-- name: "Install Ranger Solr"
+- name: Install Ranger Solr
   hosts: ranger_solr
   tasks:
-    - tosit.tdp.resolve:
-        node_name: ranger_admin
-    - import_role:
+    - tosit.tdp.resolve: # noqa unnamed-task
+        node_name: ranger_solr
+    - name: Install Ranger Solr
+      import_role:
         name: tosit.tdp.ranger.solr
         tasks_from: install
-    - meta: clear_facts
+    - meta: clear_facts # noqa unnamed-task

@@ -2,21 +2,39 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ---
-- import_role:
+- name: Ensure common kerberos installation tasks are performed
+  import_role:
     name: tosit.tdp.utils.kerberos
     tasks_from: install
 
-- import_role:
+- name: Ensure zookeeper user's principal and keytab exist
+  import_role:
     name: tosit.tdp.utils.kerberos
     tasks_from: create_principal_keytab
   vars:
-    principal: "zookeeper"
+    principal: "{{ zookeeper_headless_principal }}"
     keytab: "zookeeper.headless.keytab"
     user: "{{ zookeeper_user }}"
     group: "{{ hadoop_group }}"
-    mode: "600"
+    mode: "0600"
+  when: krb_create_principals_keytabs
+
+- name: Check zookeeper user's keytab works
+  import_role:
+    name: tosit.tdp.utils.kerberos
+    tasks_from: check_secure_keytab
+  vars:
+    principal: "{{ zookeeper_headless_principal }}"
+    keytab: "zookeeper.headless.keytab"
+    user: "{{ zookeeper_user }}"
+    group: "{{ hadoop_group }}"
+    mode: "0600"
+  when: not krb_create_principals_keytabs
 
 - name: Template jaas.conf
   template:
     src: jaas.client.conf.j2
     dest: "{{ zookeeper_client_conf_dir }}/jaas.conf"
+    owner: root
+    group: root
+    mode: "644"

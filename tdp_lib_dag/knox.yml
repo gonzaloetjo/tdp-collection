@@ -20,21 +20,30 @@
 
 - name: knox_jmx-exporter_config
   depends_on:
+    - tdp-cluster_config
     - exporter_jmx_install
 
 - name: knox_gateway_config
   depends_on:
+    - tdp-cluster_config
+    - ranger_admin_config
+    - hadoop_client_config
     - knox_kerberos_install
     - knox_ssl-tls_install
 
 - name: knox_ranger_config
   depends_on:
-    - ranger_admin_config
+    - tdp-cluster_config
     - knox_ranger_install
     - knox_gateway_config
 
+- name: knox_hdfs_init
+  depends_on:
+    - hdfs_client_init
+
 - name: knox_gateway_start
   depends_on:
+    - knox_hdfs_init
     - knox_gateway_config
     - knox_ranger_config
     - knox_ranger_init

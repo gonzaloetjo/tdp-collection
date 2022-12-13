@@ -4,10 +4,13 @@
 ---
 - name: Zookeeper server component check
   hosts: zk
+  environment:
+    LC_ALL: C
   tasks:
-    - tosit.tdp.resolve:
-        node_name: zookeeper
-    - import_role:
+    - tosit.tdp.resolve: # noqa unnamed-task
+        node_name: zookeeper_server
+    - name: Check zookeeper server
+      import_role:
         name: tosit.tdp.zookeeper.server
         tasks_from: check
-    - meta: clear_facts
+    - meta: clear_facts # noqa unnamed-task

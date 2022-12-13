@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function
 __metaclass__ = type
 
 from ansible.errors import AnsibleError
+from ansible.module_utils.common._collections_compat import Mapping
 from ansible.module_utils.six import string_types
 from ansible.plugins.action import ActionBase
 from ansible.utils.display import Display
@@ -19,11 +20,11 @@ from ansible_collections.tosit.tdp.plugins.module_utils.constants import (
 
 display = Display()
 
-MANDATORY_GROUPS = [PREFIX + "all", PREFIX + "hadoop"] 
+MANDATORY_GROUPS = [PREFIX + "all", PREFIX + "tdp-cluster", PREFIX + "hadoop"]
 
 # Example:
 #   node_name: hdfs_datanode_conf
-#   result: ["all", "hadoop", "hdfs", "hdfs_datanode", "hdfs_datanode_conf"]
+#   result: ["all", "tdp-cluster", "hadoop", "hdfs", "hdfs_datanode", "hdfs_datanode_conf"]
 def get_node_groups_from_node_name(node_name):
     splits = node_name.split(SEPARATOR_CHAR)
     node_groups = [PREFIX + splits[0]]
@@ -58,12 +59,17 @@ class ActionModule(ActionBase):
         global_facts_with_tdp_prefix = [
             key for key in task_vars.keys() if key.startswith(PREFIX)
         ]
-        groups = MANDATORY_GROUPS + sort_groups(global_facts_with_tdp_prefix, node_groups)
+        groups = MANDATORY_GROUPS + sort_groups(
+            global_facts_with_tdp_prefix, node_groups
+        )
         display.v("Group order: " + str(groups))
         # Merge all tdp_vars groups
         vars = {}
         for group in groups:
             vars_from_group = task_vars.get(group, {})
+            # Case when the tdp_vars file is empty
+            if vars_from_group is None:
+                vars_from_group = {}
             vars = merge_hash(vars, vars_from_group)
 
         # HostVars are more important than a group var
@@ -73,7 +79,18 @@ class ActionModule(ActionBase):
         self._templar.available_variables = vars_merged_with_task_vars
         # Template the merged dict using ansible templating engine
         result["ansible_facts"] = {
-            key: self._templar.template(vars_merged_with_task_vars[key]) for key in vars
+            self._templar.template(key): self._template_with_keys(
+                vars_merged_with_task_vars[key]
+            )
+            for key in vars
         }
         result["changed"] = False
         return result
+
+    def _template_with_keys(self, value_to_template):
+        if isinstance(value_to_template, Mapping):
+            return {
+                self._templar.template(key): self._template_with_keys(value)
+                for key, value in value_to_template.items()
+            }
+        return self._templar.template(value_to_template)

@@ -2,9 +2,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ---
-- name: "Stop Ranger Solr"
+- name: Stop Ranger Solr
   hosts: ranger_solr
   tasks:
-    - import_role:
+    - tosit.tdp.resolve: # noqa unnamed-task
+        node_name: ranger_solr
+    - name: Stop Ranger Solr
+      import_role:
         name: tosit.tdp.ranger.solr
         tasks_from: stop
+    - meta: clear_facts # noqa unnamed-task

@@ -25,6 +25,8 @@ hive_pid_dir: /var/run/hive
 
 # Hive logging directory
 hive_log_dir: /var/log/hive
+hive_s2_log_file: hiveserver2.log
+hive_ms_log_file: metastore.log
 
 # Properties
 hadoop_home: /opt/tdp/hadoop
@@ -39,8 +41,16 @@ hive_jdbc_connector_package: mysql-connector-java
 hive_ms_db_url: jdbc:mysql://tdp-db-1.lxd:3306
 hive_ms_db_name: hive
 hive_ms_db_user: hive
-hive_ms_db_password: hive123
+hive_ms_db_password: hive
 db_type: mysql
+
+# Kerberos
+###
+# Set to 'no' to skip service principals and keytabs creation.
+# This can be useful if TDP operators don't have admin access to the Kerberos server,
+# or if the Kerberos server does not support MIT Kerberos tools.
+###
+krb_create_principals_keytabs: yes
 
 # SSL Keystore and Truststore
 hive_keystore_location: /etc/ssl/certs/keystore.jks
@@ -50,60 +60,90 @@ hive_truststore_password: Truststore123!
 
 # hive-site.xml - common
 hive_site:
-# javax.jdo.option.ConnectionURL: "{{ hive_ms_db_url }}/{{ hive_ms_db_name }}"
-  datanucleus.schema.auto: "false"
+  hive.zookeeper.quorum: >-
+    {{ 
+      groups['zk'] | 
+      map('tosit.tdp.access_fqdn', hostvars) |
+      map('regex_replace', '^(.*)$', '\1:' + zookeeper_server_client_port | string) |
+      list |
+      join(',')
+    }}
+  hive.execution.engine: tez
+  hive.exec.scratchdir: /tmp/hive
+  # Metastore server and client properties
+  hive.metastore.sasl.enabled: "true"
+  metastore.kerberos.principal: hive/_HOST@{{ realm }}
+  metastore.thrift.uri.selection: RANDOM
+  metastore.thrift.uris: >-
+    {{
+      groups['hive_ms'] | 
+      map('tosit.tdp.access_fqdn', hostvars) |
+      map('regex_replace', '^(.*)$', 'thrift://\1:' + hive_metastore_thrift_port | string) |
+      list |
+      join(',')
+    }}
+
+metastore_site:
+  datanucleus.schema.autoCreateAll: "false"
   javax.jdo.option.ConnectionDriverName: com.mysql.jdbc.Driver
   javax.jdo.option.ConnectionUserName: "{{ hive_ms_db_user }}"
   metastore.hmshandler.retry.interval: 2
+  metastore.hmshandler.retry.attempts: 10
   metastore.stats.autogather: "true"
-  metastore.uris: thrift://{{ groups['hive_ms'][0] | tosit.tdp.access_fqdn(hostvars) }}:9083
-  hive.exec.scratchdir: /tmp/hive
-  hive.metastore.authentication: KERBEROS
-  hive.metastore.hmshandler.retry.attempts: 10
-  hive.metastore.kerberos.keytab.file: /etc/security/keytabs/hive_ms.service.keytab
-  hive.metastore.kerberos.principal: "hive_ms/_HOST@{{ realm }}"
-  hive.metastore.keystore.password: "{{ hive_keystore_password }}"
-  hive.metastore.keystore.path: "{{ hive_keystore_location }}"
-  hive.metastore.sasl.enabled: "true"
-  hive.metastore.schema.verification: "true"
-  hive.metastore.truststore.password: "{{ hive_truststore_password }}"
-  hive.metastore.truststore.path: "{{ hive_truststore_location }}"
-  hive.metastore.use.SSL: "true"
-  hive.metastore.warehouse.dir: /warehouse/tablespace/managed/hive
-  hive.metastore.warehouse.external.dir: /warehouse/tablespace/external/hive
-  hive.server2.transport.mode: http
-  hive.server2.thrift.http.port: 10001
-  hive.server2.thrift.http.path: cliservice
+  metastore.metrics.enabled: "true"
+  # defined in hive_site
+  # metastore.sasl.enabled: "true"
+  # metastore.kerberos.principal: hive/_HOST@{{ realm }}
+  metastore.kerberos.keytab.file: /etc/security/keytabs/hive.service.keytab
+  metastore.schema.verification: "true"
+  metastore.schema.verification.record.version: "true"
+  metastore.warehouse.dir: /warehouse/tablespace/managed/hive
+  metastore.warehouse.external.dir: /warehouse/tablespace/external/hive
+  metastore.cluster.delegation.token.store.class: org.apache.hadoop.hive.thrift.DBTokenStore
+
+hiveserver2_site:
   hive.server2.authentication: KERBEROS
-  hive.server2.authentication.kerberos.principal: "hive/_HOST@{{ realm }}"
+  hive.server2.transport.mode: http
+  hive.server2.thrift.http.path: cliservice
+  hive.server2.thrift.http.port: 10001
+  hive.server2.thrift.sasl.qop: auth
+  hive.server2.authentication.kerberos.principal: hive/_HOST@{{ realm }}
   hive.server2.authentication.kerberos.keytab: /etc/security/keytabs/hive.service.keytab
-  hive.server2.authentication.spnego.principal: "HTTP/_HOST@{{ realm }}"
+  hive.server2.authentication.spnego.principal: HTTP/_HOST@{{ realm }}
   hive.server2.authentication.spnego.keytab: /etc/security/keytabs/spnego.service.keytab
+  hive.server2.support.dynamic.service.discovery: "true"
   hive.server2.use.SSL: "true"
   hive.server2.keystore.password: "{{ hive_keystore_password }}"
   hive.server2.keystore.path: "{{ hive_keystore_location }}"
-  hive.server2.support.dynamic.service.discovery: "true"
-  hive.zookeeper.quorum: localhost:2181
-  hive.execution.engine: tez
-  hive.metastore.metrics.enabled: true
-  hive.server2.metrics.enabled: true
+  # Hive Server2 web UI disabled by default
+  hive.server2.webui.port: "{{ hive_hiveserver2_webui_port }}"
+  hive.server2.webui.use.ssl: "true"
+  hive.server2.webui.keystore.path: "{{ hive_keystore_location }}"
+  hive.server2.webui.keystore.password: "{{ hive_keystore_password }}"
+  hive.server2.metrics.enabled: "true"
+  hive.server2.thrift.http.cookie.auth.enabled: "false"
+
+beeline_site:
+  beeline.hs2.jdbc.url.zk_cluster: jdbc:hive2://{{ hive_site["hive.zookeeper.quorum"] }}/;serviceDiscoveryMode=zooKeeper;zooKeeperNamespace=hiveserver2;principal={{ hiveserver2_site["hive.server2.authentication.kerberos.principal"] }};sslTrustStore={{ hive_truststore_location }};trustStorePassword={{ hive_truststore_password }}
+  beeline.hs2.jdbc.url.default: zk_cluster
 
 # Ranger Hive properties
 ranger_hive_release: ranger-2.0.1-TDP-0.1.0-SNAPSHOT-hive-plugin
 ranger_hive_dist_file: "{{ ranger_hive_release }}.tar.gz"
 ranger_hive_install_dir: "{{ hive_root_dir }}/ranger-hive-plugin"
 ranger_hive_install_properties:
-  audit_hdfs: hdfs://mycluster
-  POLICY_MGR_URL: https://{{ groups['ranger_admin'][0] | tosit.tdp.access_fqdn(hostvars) }}:6182
+  audit_hdfs: "hdfs://{{ cluster_name }}"
+  POLICY_MGR_URL: https://{{ groups['ranger_admin'][0] | tosit.tdp.access_fqdn(hostvars) }}:{{ ranger_adm_https_port }}
   REPOSITORY_NAME: hive-tdp
   XAAUDIT_SOLR_ENABLE: "{% if 'ranger_solr' in groups and groups['ranger_solr'] %}true{% else %}false{% endif %}"
-  XAAUDIT_SOLR_URL: "{% if 'ranger_solr' in groups and groups['ranger_solr'] %}http://{{ groups['ranger_solr'][0] | tosit.tdp.access_fqdn(hostvars) }}:8983/solr/ranger_audits{% else %}NONE{% endif %}"
-  zookeeper_quorum: |
+  XAAUDIT_SOLR_URL: "{% if 'ranger_solr' in groups and groups['ranger_solr'] %}http://{{ groups['ranger_solr'][0] | tosit.tdp.access_fqdn(hostvars) }}:{{ ranger_solr_http_port }}/solr/ranger_audits{% else %}NONE{% endif %}"
+  zookeeper_quorum: >-
     {{ groups['zk'] | 
       map('tosit.tdp.access_fqdn', hostvars) |
-      map('regex_replace', '^(.*)$', '\1:2181') |
+      map('regex_replace', '^(.*)$', '\1:' + zookeeper_server_client_port | string) |
       list |
-      join(',') | trim }}
+      join(',')
+    }}
 
 # Tez properties
 tez_release: tez-0.9.1-TDP-0.1.0-SNAPSHOT
@@ -118,6 +158,10 @@ tez_site:
   tez.lib.uris: "/tdp/tez/{{ tez_dist_file }}"
   tez.am.java.opts: -server -Xmx819m -Djava.net.preferIPv4Stack=true
   hive.tez.container.size: 1024
+
+# Service start on boot policies
+hiveserver2_start_on_boot: no
+hivemetastore_start_on_boot: no
 
 # Service restart policies
 hiveserver2_restart: "no"
@@ -134,8 +178,8 @@ jmx_exporter_conf_dir: /etc/jmx-exporter
 jmx_common_opts: "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=true -Dcom.sun.management.jmxremote.ssl=true"
 
 # jmx-exporter
-jmx_exporter_hs2_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18114:{{ jmx_exporter_conf_dir }}/hs2.yml{% else %}{% endif %}"
-jmx_exporter_hms_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18115:{{ jmx_exporter_conf_dir }}/hms.yml{% else %}{% endif %}"
+jmx_exporter_hs2_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_hive_hs2_http_port }}:{{ jmx_exporter_conf_dir }}/hs2.yml{% else %}{% endif %}"
+jmx_exporter_hms_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_hive_hms_http_port }}:{{ jmx_exporter_conf_dir }}/hms.yml{% else %}{% endif %}"
 
 jmxremote_username: jmxuser
 jmxremote_password: Tdpjmx123,

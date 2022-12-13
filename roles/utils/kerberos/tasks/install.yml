@@ -2,7 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ---
-- name: Ensures {{ keytabs_dir }} exists
+- name: Ensure {{ keytabs_dir }} exists
   file:
     path: "{{ keytabs_dir }}"
     state: directory
+    owner: root
+    group: root
+    mode: 0755

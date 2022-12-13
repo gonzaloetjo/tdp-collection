@@ -1,0 +1,120 @@
+# Copyright 2022 TOSIT.IO
+# SPDX-License-Identifier: Apache-2.0
+
+---
+#######################
+# Cluster-wide config #
+#######################
+
+# Name of the cluster. Used as HDFS nameservice and YARN cluster ID
+cluster_name: mycluster
+
+#############################
+# Service & Component ports #
+#############################
+
+# Zookeeper ports
+zookeeper_server_client_port: 2181
+zookeeper_server_quorum_port: 2888
+zookeeper_server_election_port: 3888
+
+# Ranger ports
+ranger_adm_http_port: 6080
+ranger_adm_https_port: 6182
+ranger_kms_http_port: 9292
+ranger_kms_https_port: 9393
+ranger_usersync_https_port: 5151
+ranger_solr_http_port: 8983
+
+# HDFS ports
+hdfs_zkfc_rpc_port: 8019
+hdfs_nn_rpc_port: 8020
+hdfs_nn_http_port: 9870
+hdfs_nn_https_port: 9871
+hdfs_dn_data_port: 9866
+hdfs_dn_ipc_port: 9867
+hdfs_dn_https_port: 9865
+hdfs_jn_rpc_port: 8485
+hdfs_jn_https_port: 8481
+
+# YARN ports
+yarn_rm_scheduler_port: 8030
+yarn_rm_tracker_port: 8031
+yarn_rm_jobs_port: 8032
+yarn_rm_admin_port: 8033
+yarn_rm_http_port: 8088
+yarn_rm_https_port: 8090
+yarn_nm_localizer_port: 8040
+yarn_nm_rpc_port: 45454
+yarn_nm_http_port: 8042
+yarn_nm_https_port: 8044
+yarn_ats_rpc_port: 10200
+yarn_ats_https_port: 8190
+
+# Mapred ports
+mapred_sh_shuffle_port: 13562
+# Pool of ports available to MR job application masters
+mapred_am_bind_portrange: 50000-50999
+mapred_jhs_rpc_port: 10201
+mapred_jhs_admin_port: 10033
+mapred_jhs_http_port: 19888
+mapred_jhs_https_port: 19890
+
+# Hive ports
+hive_hiveserver2_thrift_port: 10001
+hive_metastore_thrift_port: 9083
+hive_hiveserver2_webui_port: 0
+
+# HBase ports
+hbase_master_rpc_port: 16000
+hbase_master_info_https_port: 16010
+hbase_rs_rpc_port: 16020
+hbase_rs_info_https_port: 16030
+hbase_rest_https_port: 8080
+hbase_rest_info_https_port: 8085
+
+# Phoenix Ports
+phoenix_queryserver_https_port: 8765
+
+# Spark ports
+spark_hs_http_port: 18080
+spark_hs_https_port: 18081
+
+# Spark3 ports
+spark3_hs_http_port: 18082
+spark3_hs_https_port: 18083
+
+# Knox ports
+knox_gateway_https_port: 8443
+
+# Exporter ports 
+exporter_node_http_port: 9100
+
+exporter_hdfs_nn_http_port: 18101
+exporter_hdfs_zkfc_http_port: 18102
+exporter_hdfs_jn_http_port: 18103
+exporter_hdfs_dn_http_port: 18104
+
+exporter_yarn_rm_http_port: 18105
+exporter_yarn_nm_http_port: 18106
+exporter_yarn_ats_http_port: 18107
+exporter_mapred_jhs_http_port: 18108
+
+exporter_zookeeper_server_http_port: 18109
+
+exporter_hbase_hm_http_port: 18110
+exporter_hbase_hrs_http_port: 18111
+exporter_hbase_hr_http_port: 18112
+exporter_hbase_pqs_http_port: 18113
+
+exporter_hive_hs2_http_port: 18114
+exporter_hive_hms_http_port: 18115
+
+exporter_knox_gateway_http_port: 18116
+
+exporter_ranger_ra_http_port: 18117
+exporter_ranger_ru_http_port: 18118
+exporter_ranger_kms_http_port: 18119
+
+exporter_spark_hs_http_port: 18120
+exporter_spark3_hs_http_port: 18121

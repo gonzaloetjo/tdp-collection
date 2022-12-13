@@ -1,0 +1,9 @@
+# Copyright 2022 TOSIT.IO
+# SPDX-License-Identifier: Apache-2.0
+
+---
+- name: Start Ranger KMS
+  service:
+    name: ranger-kms
+    state: started
+    enabled: "{{ ranger_kms_start_on_boot }}"

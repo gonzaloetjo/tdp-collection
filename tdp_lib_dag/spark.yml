@@ -19,12 +19,22 @@
 
 - name: spark_client_config
   depends_on:
+    - tdp-cluster_config
+    - hadoop_client_config
     - spark_kerberos_install
+    - hbase_client_config
 
 - name: spark_historyserver_config
   depends_on:
+    - tdp-cluster_config
+    - hadoop_client_config
     - spark_kerberos_install
     - spark_ssl-tls_install
+
+- name: spark_jmx-exporter_config
+  depends_on:
+    - tdp-cluster_config
+    - exporter_jmx_install
 
 - name: spark_hdfs_init
   depends_on:
@@ -32,6 +42,7 @@
 
 - name: spark_historyserver_start
   depends_on:
+    - spark_jmx-exporter_config
     - yarn_client_config
     - spark_historyserver_config
     - spark_hdfs_init
@@ -55,6 +66,7 @@
     - spark_install
     - spark_client_config
     - spark_historyserver_config
+    - hbase_client_config
 
 - name: spark_start
   noop: yes

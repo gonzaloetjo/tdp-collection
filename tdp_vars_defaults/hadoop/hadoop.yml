@@ -42,21 +42,35 @@ jmx_common_opts: "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxre
 jaas_nn_opts: "-Djava.security.auth.login.config={{ hadoop_nn_conf_dir }}/krb5JAASnn.conf"
 
 # jmx-exporter
-jmx_exporter_nn_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18101:{{ jmx_exporter_conf_dir }}/nn.yml{% else %}{% endif %}"
-jmx_exporter_zkfc_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18102:{{ jmx_exporter_conf_dir }}/zkfc.yml{% else %}{% endif %}"
-jmx_exporter_jn_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18103:{{ jmx_exporter_conf_dir }}/jn.yml{% else %}{% endif %}"
-jmx_exporter_dn_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18104:{{ jmx_exporter_conf_dir }}/dn.yml{% else %}{% endif %}"
+jmx_exporter_nn_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_hdfs_nn_http_port }}:{{ jmx_exporter_conf_dir }}/nn.yml{% else %}{% endif %}"
+jmx_exporter_zkfc_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_hdfs_zkfc_http_port }}:{{ jmx_exporter_conf_dir }}/zkfc.yml{% else %}{% endif %}"
+jmx_exporter_jn_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_hdfs_jn_http_port }}:{{ jmx_exporter_conf_dir }}/jn.yml{% else %}{% endif %}"
+jmx_exporter_dn_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_hdfs_dn_http_port }}:{{ jmx_exporter_conf_dir }}/dn.yml{% else %}{% endif %}"
 
-jmx_exporter_rm_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18105:{{ jmx_exporter_conf_dir }}/rm.yml{% else %}{% endif %}"
-jmx_exporter_nm_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18106:{{ jmx_exporter_conf_dir }}/nm.yml{% else %}{% endif %}"
-jmx_exporter_ats_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18107:{{ jmx_exporter_conf_dir }}/ats.yml{% else %}{% endif %}"
-jmx_exporter_jhs_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18108:{{ jmx_exporter_conf_dir }}/jhs.yml{% else %}{% endif %}"
-
+jmx_exporter_rm_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_yarn_rm_http_port }}:{{ jmx_exporter_conf_dir }}/rm.yml{% else %}{% endif %}"
+jmx_exporter_nm_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_yarn_nm_http_port }}:{{ jmx_exporter_conf_dir }}/nm.yml{% else %}{% endif %}"
+jmx_exporter_ats_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_yarn_ats_http_port }}:{{ jmx_exporter_conf_dir }}/ats.yml{% else %}{% endif %}"
+jmx_exporter_jhs_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_mapred_jhs_http_port }}:{{ jmx_exporter_conf_dir }}/jhs.yml{% else %}{% endif %}"
 
 # Hadoop logging directory
 hadoop_log_dir: /var/log/hadoop
 hadoop_env_client_log_dir: /var/log/hadoop/$USER
 hadoop_log4j_client_log_dir: .
+
+# Kerberos
+###
+# Set to 'no' to skip service principals and keytabs creation.
+# This can be useful if TDP operators don't have admin access to the Kerberos server,
+# or if the Kerberos server does not support MIT Kerberos tools.
+###
+krb_create_principals_keytabs: true
+zookeeper_headless_principal: zookeeper
+hdfs_headless_principal: hdfs
+yarn_headless_principal: yarn
+mapred_headless_principal: mapred
+hbase_headless_principal: hbase
+hive_headless_principal: hive
+spark_headless_principal: spark
 
 # SSL Keystore and Truststore
 hadoop_keystore_location: /etc/ssl/certs/keystore.jks
@@ -82,32 +96,55 @@ ssl_client:
 http_secret_location: /etc/security/http_secret
 http_cookie_domain: tdp.local
 
-# Zookeeper servers listen port
-zookeeper_server_client_port: 2181
-
 # Properties
 java_home: /usr/lib/jvm/jre-1.8.0-openjdk
 
 hadoop_ha_zookeeper_quorum: |
   {{ groups['zk'] | 
      map('tosit.tdp.access_fqdn', hostvars) |
-     map('regex_replace', '^(.*)$', '\1:' + (zookeeper_server_client_port | string)) |
+     map('regex_replace', '^(.*)$', '\1:' + zookeeper_server_client_port | string) |
      list |
      join(',') }}
-     
+
+auth_to_local:
+  hdfs:
+    - RULE:[2:$1/$2@$0]([ndj]n/.*@{{ realm }})s/.*/hdfs/
+    - RULE:[1:$1@$0]({{ hdfs_headless_principal }}@{{ realm }})s/.*/hdfs/
+  yarn:
+    - RULE:[2:$1/$2@$0]([rn]m/.*@{{ realm }})s/.*/yarn/
+    - RULE:[1:$1@$0]({{ yarn_headless_principal }}@{{ realm }})s/.*/yarn/
+  mapred:
+    - RULE:[2:$1/$2@$0](jhs/.*@{{ realm }})s/.*/mapred/
+    - RULE:[1:$1@$0]({{ mapred_headless_principal }}@{{ realm }})s/.*/mapred/
+  hive:
+    - RULE:[2:$1/$2@$0](hive/.*@{{ realm }})s/.*/hive/
+    - RULE:[1:$1@$0]({{ hive_headless_principal }}@{{ realm }})s/.*/hive/
+  hbase:
+    - RULE:[1:$1@$0]({{ hbase_headless_principal }}@{{ realm }})s/.*/hbase/
+  zookeeper:
+    - RULE:[1:$1@$0]({{ zookeeper_headless_principal }}@{{ realm }})s/.*/zookeeper/
+  spark:
+    - RULE:[1:$1@$0]({{ spark_headless_principal }}@{{ realm }})s/.*/spark/
+  ranger:
+    - RULE:[2:$1/$2@$0](rangeradmin/.*@{{ realm }})s/.*/rangeradmin/
+    - RULE:[2:$1/$2@$0](keyadmin/.*@{{ realm }})s/.*/keyadmin/
+
+
+# Rack awareness
+rack_prefix: default
+
 # core-site.xml - common
 core_site:
-  fs.defaultFS: "hdfs://mycluster"
+  fs.defaultFS: "hdfs://{{ cluster_name }}"
   ha.zookeeper.quorum: "{{ hadoop_ha_zookeeper_quorum | trim }}"
   ha.zookeeper.acl: sasl:nn:rwcda
   hadoop.rpc.protection: authentication
   hadoop.security.authentication: kerberos
   hadoop.security.authorization: "true"
-  hadoop.security.auth_to_local: |
-    RULE:[2:$1/$2@$0]([ndj]n/.*@{{ realm }})s/.*/hdfs/
-    RULE:[2:$1/$2@$0]([rn]m/.*@{{ realm }})s/.*/yarn/
-    RULE:[2:$1/$2@$0](jhs/.*@{{ realm }})s/.*/mapred/
-    RULE:[2:$1/$2@$0](hive/.*@{{ realm }})s/.*/hive/
+  hadoop.security.auth_to_local: |-
+    {% for rule in (auth_to_local | dict2items | map(attribute='value') | flatten) %}
+    {{ rule }}
+    {% endfor %}
     DEFAULT
   hadoop.proxyuser.hbase.groups: "*"
   hadoop.proxyuser.hbase.hosts: "*"
@@ -118,8 +155,6 @@ core_site:
   hadoop.proxyuser.knox.groups: "*"
   hadoop.proxyuser.knox.hosts: "*"
   hadoop.proxyuser.knox.users: "*"
-  hadoop.proxyuser.oozie.hosts: "*"
-  hadoop.proxyuser.oozie.groups: "*"
   hadoop.proxyuser.phoenixqueryserver.hosts: "*"
   hadoop.proxyuser.phoenixqueryserver.groups: "*"
   # kerberos auth for the webuis
@@ -127,12 +162,14 @@ core_site:
   hadoop.http.authentication.kerberos.keytab: /etc/security/keytabs/spnego.service.keytab
   hadoop.http.authentication.kerberos.principal: "HTTP/_HOST@{{ realm }}"
   hadoop.http.filter.initializers: org.apache.hadoop.security.AuthenticationFilterInitializer
-  hadoop.http.authentication.simple.anonymous.allowed: false
+  hadoop.http.authentication.simple.anonymous.allowed: "false"
   hadoop.http.authentication.signature.secret.file: "{{ http_secret_location }}"
   hadoop.http.authentication.cookie.domain: "{{ http_cookie_domain }}"
   hadoop.ssl.server.conf: ssl-server.xml
   hadoop.ssl.client.conf: ssl-client.xml
   fs.trash.checkpoint.interval: 360
+  hadoop.security.key.provider.path: "{% if 'ranger_kms' in groups and groups['ranger_kms'] %}{{ ranger_kms_url }}{% else %}{% endif %}"
+  net.topology.script.file.name: "{{ hadoop_client_conf_dir }}/rack-topology.sh"
 
 # mapred-site.xml
 mapred_site:
@@ -143,27 +180,28 @@ mapred_site:
   mapreduce.reduce.java.opts: -Xmx1536m
   mapreduce.application.classpath: /opt/tdp/hadoop/share/hadoop/mapreduce/*,/opt/tdp/hadoop/share/hadoop/mapreduce/lib/*,/etc/hadoop/conf/
   # jobhistory conf
-  mapreduce.jobhistory.address: "{{ groups['mapred_jhs'][0] | tosit.tdp.access_fqdn(hostvars) }}:10201"
-  mapreduce.jobhistory.webapp.address: "{{ groups['mapred_jhs'][0] | tosit.tdp.access_fqdn(hostvars) }}:19888"
-  mapreduce.jobhistory.webapp.https.address: "{{ groups['mapred_jhs'][0] | tosit.tdp.access_fqdn(hostvars) }}:19890"
+  mapreduce.jobhistory.address: "{{ groups['mapred_jhs'][0] | tosit.tdp.access_fqdn(hostvars) }}:{{ mapred_jhs_rpc_port }}"
+  mapreduce.jobhistory.admin.address: "{{ groups['mapred_jhs'][0] | tosit.tdp.access_fqdn(hostvars) }}:{{ mapred_jhs_admin_port }}"
+  mapreduce.jobhistory.webapp.address: "{{ groups['mapred_jhs'][0] | tosit.tdp.access_fqdn(hostvars) }}:{{ mapred_jhs_http_port }}"
+  mapreduce.jobhistory.webapp.https.address: "{{ groups['mapred_jhs'][0] | tosit.tdp.access_fqdn(hostvars) }}:{{ mapred_jhs_https_port }}"
   mapreduce.jobhistory.intermediate-done-dir: /mr-history/tmp
   mapreduce.jobhistory.done-dir: /mr-history/done
   mapreduce.jobhistory.principal: jhs/_HOST@{{ realm }}
   mapreduce.jobhistory.keytab: /etc/security/keytabs/jhs.service.keytab
   mapreduce.jobhistory.bind-host: 0.0.0.0
-  mapreduce.cluster.acls.enabled: true
-  mapreduce.cluster.administrators: mapred,yarn,knox 
-  mapreduce.jobhistory.admin.acl: "*" 
+  mapreduce.cluster.acls.enabled: "true"
+  mapreduce.cluster.administrators: mapred,yarn,knox
+  mapreduce.jobhistory.admin.acl: "*"
   mapreduce.jobhistory.http.policy: HTTPS_ONLY
-  mapreduce.jobhistory.webapp.spnego-principal: HTTP/_HOST@{{ realm }} 
+  mapreduce.jobhistory.webapp.spnego-principal: HTTP/_HOST@{{ realm }}
   mapreduce.jobhistory.webapp.spnego-keytab-file: /etc/security/keytabs/spnego.service.keytab
   ###
   # The yarn.app.mapreduce.am.job.client.port-range property controls the pool of ports available to MR job application masters.
   # After adding this to the mapred-site.xml, the following MR jobs will only use ports in this range
   # Default values are blank strings meaning unrestricted port range.
-  # The below example is randomly selected for demonstration purposes only.
   ###
-  # yarn.app.mapreduce.am.job.client.port-range: "40000-50000"
+  yarn.app.mapreduce.am.job.client.port-range: "{{ mapred_am_bind_portrange }}"
+  mapreduce.shuffle.port: "{{ mapred_sh_shuffle_port }}"
 
 jmxremote_username: jmxuser
 jmxremote_password: Tdpjmx123,
@@ -176,3 +214,10 @@ jmx_exporter:
   lowercaseOutputName: false
   lowercaseOutputLabelNames: false
 
+# Ranger KMS url
+ranger_kms_url: "{% if 'ranger_kms' in groups and groups['ranger_kms'] %}kms://https@{{ ranger_kms_hosts }}:{{ ranger_kms_https_port }}/kms{% else %}NONE{% endif %}"
+ranger_kms_hosts: |-
+  {% if 'ranger_kms' in groups and groups['ranger_kms'] %}
+  {{ groups['ranger_kms'] | 
+    map('tosit.tdp.access_fqdn', hostvars) |
+    join(';') }}{% else %}NONE{% endif %}

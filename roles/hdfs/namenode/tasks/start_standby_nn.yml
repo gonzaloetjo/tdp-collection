@@ -3,7 +3,7 @@
 
 ---
 - name: Bootstrap standby namenode
-  become: yes
+  become: true
   become_user: "{{ hdfs_user }}"
   command: "/opt/tdp/hadoop/bin/hdfs --config /etc/hadoop/conf.nn namenode -bootstrapStandby -nonInteractive"
   args:
@@ -14,14 +14,16 @@
     path: "{{ hadoop_hdfs_dir }}"
     owner: "{{ hdfs_user }}"
     group: "{{ hadoop_group }}"
-    recurse: yes
+    recurse: true
 
 - name: Start standby namenode
   service:
     name: hadoop-hdfs-namenode
     state: started
+    enabled: "{{ hdfs_nn_start_on_boot }}"
 
 - name: Start zkfc
   service:
     name: hadoop-hdfs-zkfc
     state: started
+    enabled: "{{ hdfs_zkfc_start_on_boot }}"

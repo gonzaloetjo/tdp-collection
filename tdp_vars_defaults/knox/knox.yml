@@ -10,6 +10,7 @@ knoxshell_release: knoxshell-1.6.1-TDP-0.1.0-SNAPSHOT
 knoxshell_dist_file: "{{ knoxshell_release }}.tar.gz"
 
 # Knox users and group
+hdfs_user: hdfs
 knox_user: knox
 knox_group: hadoop
 
@@ -31,6 +32,14 @@ knox_data_dir: /var/lib/knox
 # Knox Keystore directory
 knox_keystore_dir: "{{ knox_data_dir }}/data/security/keystores"
 
+# Kerberos
+###
+# Set to 'no' to skip service principals and keytabs creation.
+# This can be useful if TDP operators don't have admin access to the Kerberos server,
+# or if the Kerberos server does not support MIT Kerberos tools.
+###
+krb_create_principals_keytabs: yes
+
 # SSL Keystore and Truststore
 knox_keystore_location: "{{ knox_keystore_dir }}/gateway.jks"
 knox_keystore_password: Keystore123!
@@ -42,7 +51,7 @@ hadoop_conf_dir: /etc/hadoop/conf
 
 # Gateway-site
 gateway_site:
-  gateway.port: 8443
+  gateway.port: "{{ knox_gateway_https_port }}"
   gateway.path: gateway
   gateway.hadoop.kerberos.secured: "true"
   java.security.krb5.conf: /etc/krb5.conf
@@ -61,7 +70,7 @@ topology_common_ha_configuration: maxFailoverAttempts=3;failoverSleep=1000;maxRe
 zookeeper_quorum: |
   {{ groups['zk'] | 
     map('tosit.tdp.access_fqdn', hostvars) |
-    map('regex_replace', '^(.*)$', '\1:2181') |
+    map('regex_replace', '^(.*)$', '\1:' + zookeeper_server_client_port | string) |
     list |
     join(',') }}
 
@@ -97,43 +106,46 @@ gateway_topology:
     services:
       NAMENODE:
         hosts: "{{ groups['hdfs_nn'] | map('tosit.tdp.access_fqdn', hostvars) | list }}"
-        port: 8020
+        port: "{{ hdfs_nn_rpc_port }}"
         scheme: hdfs://
       HDFSUI:
         hosts: "{{ groups['hdfs_nn'] | map('tosit.tdp.access_fqdn', hostvars) | list }}"
-        port: 9871
+        port: "{{ hdfs_nn_https_port }}"
         version: 2.7.0
       JOBHISTORYUI:
         hosts:
           - "{{ groups['mapred_jhs'] | map('tosit.tdp.access_fqdn', hostvars) | first }}"
-        port: 19890
+        port: "{{ mapred_jhs_https_port }}"
       HIVE: {}
       RANGERUI:
         hosts: "{{ groups['ranger_admin'] | map('tosit.tdp.access_fqdn', hostvars) | list }}"
-        port: 6182
+        port: "{{ ranger_adm_https_port }}"
       RESOURCEMANAGER:
         hosts: "{{ groups['yarn_rm'] | map('tosit.tdp.access_fqdn', hostvars) | list }}"
         location: /ws
-        port: 8090
+        port: "{{ yarn_rm_https_port }}"
       SPARKHISTORYUI:
         hosts: "{{ groups['spark_hs'] | map('tosit.tdp.access_fqdn', hostvars) | list }}"
-        port: 18081
+        port: "{{ spark_hs_https_port }}"
       SPARK3HISTORYUI:
         hosts: "{{ groups['spark3_hs'] | map('tosit.tdp.access_fqdn', hostvars) | list }}"
-        port: 18083
+        port: "{{ spark3_hs_https_port}}"
       WEBHBASE:
         hosts: "{{ groups['hbase_rest'] | map('tosit.tdp.access_fqdn', hostvars) | list }}"
-        port: 8080
+        port: "{{ hbase_rest_https_port }}"
       WEBHDFS:
         hosts: "{{ groups['hdfs_nn'] | map('tosit.tdp.access_fqdn', hostvars) | list }}"
         location: /webhdfs
-        port: 9871
+        port: "{{ hdfs_nn_https_port }}"
       YARNUI:
         hosts: "{{ groups['yarn_rm'] | map('tosit.tdp.access_fqdn', hostvars) | list }}"
-        port: 8090
+        port: "{{ yarn_rm_https_port }}"
       HBASEUI:
         hosts: "{{ groups['hbase_master'] | map('tosit.tdp.access_fqdn', hostvars) | list }}"
-        port: 16010
+        port: "{{ hbase_master_info_https_port }}"
+
+# Service start on boot policies
+knox_start_on_boot: no
 
 # Service restart policies
 knox_restart: "no"
@@ -143,13 +155,13 @@ ranger_knox_release: ranger-2.0.1-TDP-0.1.0-SNAPSHOT-knox-plugin
 ranger_knox_dist_file: "{{ ranger_knox_release }}.tar.gz"
 ranger_knox_install_dir: "{{ knox_root_dir }}/ranger-knox-plugin"
 ranger_knox_install_properties:
-  audit_hdfs: hdfs://mycluster
-  POLICY_MGR_URL: https://{{ groups['ranger_admin'][0] | tosit.tdp.access_fqdn(hostvars) }}:6182
+  audit_hdfs: "hdfs://{{ cluster_name }}"
+  POLICY_MGR_URL: https://{{ groups['ranger_admin'][0] | tosit.tdp.access_fqdn(hostvars) }}:{{ ranger_adm_https_port }}
   REPOSITORY_NAME: knox-tdp
   XAAUDIT_SOLR_ENABLE: "{% if 'ranger_solr' in groups and groups['ranger_solr'] %}true{% else %}false{% endif %}"
-  XAAUDIT_SOLR_URL: "{% if 'ranger_solr' in groups and groups['ranger_solr'] %}http://{{ groups['ranger_solr'][0] | tosit.tdp.access_fqdn(hostvars) }}:8983/solr/ranger_audits{% else %}NONE{% endif %}"
+  XAAUDIT_SOLR_URL: "{% if 'ranger_solr' in groups and groups['ranger_solr'] %}http://{{ groups['ranger_solr'][0] | tosit.tdp.access_fqdn(hostvars) }}:{{ ranger_solr_http_port }}/solr/ranger_audits{% else %}NONE{% endif %}"
 ranger_knox_service_properties:
-  knox_url: https://{{ groups['knox'][0] | tosit.tdp.access_fqdn(hostvars) }}:8443
+  knox_url: https://{{ groups['knox'][0] | tosit.tdp.access_fqdn(hostvars) }}:{{ knox_gateway_https_port }}
   common_name_certificate: |
     {{ groups['knox'] | 
       map('tosit.tdp.access_fqdn', hostvars) |
@@ -167,7 +179,7 @@ jmx_exporter_conf_dir: /etc/jmx-exporter
 jmx_common_opts: "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=true -Dcom.sun.management.jmxremote.ssl=true"
 
 # jmx-exporter
-jmx_exporter_kn_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}=18116:{{ jmx_exporter_conf_dir }}/kn.yml{% else %}{% endif %}"
+jmx_exporter_kn_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_knox_gateway_http_port }}:{{ jmx_exporter_conf_dir }}/kn.yml{% else %}{% endif %}"
 
 jmxremote_username: jmxuser
 jmxremote_password: Tdpjmx123,

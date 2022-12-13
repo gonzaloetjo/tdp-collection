@@ -20,8 +20,9 @@ zookeeper_root_conf_dir: /etc/zookeeper
 zookeeper_server_conf_dir: "{{ zookeeper_root_conf_dir }}/conf.server"
 zookeeper_client_conf_dir: "{{ zookeeper_root_conf_dir }}/conf"
 
-# ZooKeeper data directory
-zookeeper_data_dir: "{{ zookeeper_install_dir }}/zkData"
+# ZooKeeper server service name
+zookeeper_server_service_name: zookeeper
+zookeeper_server_service_desc: ZooKeeper Server
 
 # ZooKeeper server service name
 zookeeper_server_service_name: zookeeper
@@ -36,13 +37,12 @@ zk_servers: |
 zookeeper_client_quorum: |
   {{ groups['zk'] | 
      map('tosit.tdp.access_fqdn', hostvars) |
-     map('regex_replace', '^(.*)$', '\1:' + (zookeeper_server_client_port | string) ) |
+     map('regex_replace', '^(.*)$', '\1:' + zookeeper_server_client_port | string) |
      list |
      join(',') }}
 
-# ZooKeeper servers listen port
-zookeeper_server_quorum_port: 2888
-zookeeper_server_election_port: 3888
+# ZooKeeper CLI command
+zookeeper_cli_cmd_script: /usr/bin/zkCli.sh
 
 # ZooKeeper CLI command
 zookeeper_cli_cmd_script: /usr/bin/zkCli.sh
@@ -55,6 +55,14 @@ zookeeper_root_logger: INFO,ROLLINGFILE
 zookeeper_console_threshold: INFO
 zookeeper_log_threshold: DEBUG
 
+# Kerberos
+###
+# Set to 'no' to skip service principals and keytabs creation.
+# This can be useful if TDP operators don't have admin access to the Kerberos server,
+# or if the Kerberos server does not support MIT Kerberos tools.
+###
+krb_create_principals_keytabs: true
+
 # ZooKeeper component & service check
 zookeeper_check_retries: 0
 zookeeper_check_delay: 5
@@ -63,7 +71,7 @@ zookeeper_check_znode: "/service_check_{{ ansible_date_time.iso8601_basic }}"
 
 # zoo.cfg
 zookeeper_cfg:
-  dataDir: "{{ zookeeper_data_dir }}"
+  dataDir: "{{ zookeeper_server_data_dirs }}"
   clientPort: "{{ zookeeper_server_client_port }}"
   tickTime: 2000
   initLimit: 10
@@ -72,6 +80,9 @@ zookeeper_cfg:
   jaasLoginRenew: 3600000
   kerberos.removeHostFromPrincipal: "true"
   kerberos.removeRealmFromPrincipal: "true"
+  
+# Service start on boot policies
+zk_start_on_boot: false
 
 # Service restart policies
 zk_restart: "no"
@@ -81,8 +92,7 @@ jmx_exporter_root_dir: /opt/tdp/jmx-exporter
 jmx_exporter_install_file: "{{ jmx_exporter_root_dir }}/jmx-exporter.jar"
 jmx_common_opts: "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=true -Dcom.sun.management.jmxremote.ssl=true"
 jmx_exporter_zk_file: zk.yml
-jmx_exporter_zk_port: 18109
-jmx_exporter_zk_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ jmx_exporter_zk_port }}:{{ jmx_exporter_conf_dir }}/{{ jmx_exporter_zk_file }}{% else %}{% endif %}"
+jmx_exporter_zk_opts: "{% if 'exporter_jmx' in groups and groups['exporter_jmx'] %}-javaagent:{{ jmx_exporter_install_file }}={{ exporter_zookeeper_server_http_port }}:{{ jmx_exporter_conf_dir }}/{{ jmx_exporter_zk_file }}{% else %}{% endif %}"
 
 # jmx exporter configuration directory
 jmx_exporter_conf_dir: /etc/jmx-exporter
@@ -97,3 +107,7 @@ jmx_exporter:
   password: "{{ jmxremote_password }}"
   lowercaseOutputName: false
   lowercaseOutputLabelNames: false
+
+# zookeeper resources allocation
+zookeeper_server_heapsize: 1024m
+zookeeper_server_data_dirs: "{{ zookeeper_install_dir }}/zkData"

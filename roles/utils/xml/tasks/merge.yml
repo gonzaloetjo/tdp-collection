@@ -1,0 +1,28 @@
+# Copyright 2022 TOSIT.IO
+# SPDX-License-Identifier: Apache-2.0
+
+---
+- name: Overwrite existing properties
+  xml:
+    path: "{{ configuration_file }}"
+    xpath: /configuration/property[name='{{ item.key }}']/value
+    value: "{{ item.value }}"
+    pretty_print: true
+  loop: "{{ merge_var | dict2items }}"
+  register: overwrite_results
+  ignore_errors: true
+
+- name: Add new properties
+  xml:
+    path: "{{ configuration_file }}"
+    xpath: /configuration
+    add_children:
+      - property:
+          _:
+            - name: "{{ item.item.key }}"
+            - value: "{{ item.item.value }}"
+    pretty_print: true
+  loop: "{{ overwrite_results.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: item.failed
